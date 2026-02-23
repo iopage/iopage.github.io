@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless Public Chess</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .board { width: 400px; max-width: 90vw; margin: 0 auto; }
+        #status { font-family: monospace; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center p-4">
+
+    <h1 class="text-3xl font-bold mb-6 text-emerald-400">Public Channel Chess</h1>
+
+    <div class="bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-700 w-full max-w-md mb-6">
+        <div id="status" class="mb-4 text-center text-xs font-bold text-emerald-500 uppercase tracking-widest">
+            Ready to play
+        </div>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Room Name (Make it unique, e.g., 'chess-123')</label>
+                <div class="flex gap-2">
+                    <input id="room-id" placeholder="Enter room name..." class="bg-slate-900 border border-slate-600 rounded p-2 text-sm flex-grow outline-none focus:border-emerald-500">
+                    <button id="join-btn" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded text-sm font-bold transition">JOIN</button>
+                </div>
+            </div>
+            <p class="text-[10px] text-slate-500 italic">Tell your friend to join the same Room Name. First to join is White.</p>
+        </div>
+    </div>
+
+    <div id="board" class="board shadow-2xl rounded overflow-hidden"></div>
+
+    <div id="game-info" class="mt-6 text-center">
+        <p id="turn-display" class="text-xl font-semibold">Enter a room to start</p>
+    </div>
+
+    <script type="module">
+        import { Chessboard, COLOR, INPUT_EVENT_TYPE } from "https://cdn.jsdelivr.net/npm/cm-chessboard@8/src/cm-chessboard/Chessboard.js";
+        import { Chess } from "https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.js";
+
+        const statusEl = document.getElementById("status");
+        const turnEl = document.getElementById("turn-display");
+        const boardElement = document.getElementById("board");
+        const roomInput = document.getElementById("room-id");
+        const joinBtn = document.getElementById("join-btn");
+        
+        let game = new Chess();
+        let board = null;
+        let myColor = null;
+        let topic = null;
+        let userId = Math.random().toString(36).substring(7);
+
+        joinBtn.onclick = () => {
+            const val = roomInput.value.trim();
+            if (!val) return alert("Enter a room name!");
+            topic = val;
+            statusEl.innerText = "CONNECTING TO ROOM: " + topic;
+            
+            // Start listening for moves via EventSource (NTFY)
+            // This is a public free service that doesn't need login
+            const eventSource = new EventSource(`https://ntfy.sh/${topic}/sse`);
+            
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const message = JSON.parse(data.message);
+                
+                // Ignore messages sent by ourselves
+                if (message.sender === userId) return;
+
+                if (message.type === 'join' && !myColor) {
+                    myColor = 'b'; // We are the second person
+                    statusEl.innerText = "CONNECTED AS BLACK";
+                    startGame();
+                    sendMsg({ type: 'init', sender: userId });
+                } else if (message.type === 'init' && !myColor) {
+                    myColor = 'w'; // We are the first person
+                    statusEl.innerText = "CONNECTED AS WHITE";
+                    startGame();
+                } else if (message.type === 'move') {
+                    game.move(message.move);
+                    board.setPosition(game.fen(), true);
+                    updateUI();
+                }
+            };
+
+            // Announce presence
+            sendMsg({ type: 'join', sender: userId });
+            
+            // Fallback: If no one answers in 2s, assume we are white
+            setTimeout(() => {
+                if (!myColor) {
+                    myColor = 'w';
+                    statusEl.innerText = "CONNECTED AS WHITE (HOST)";
+                    startGame();
+                }
+            }, 2000);
+        };
+
+        async function sendMsg(obj) {
+            if (!topic) return;
+            await fetch(`https://ntfy.sh/${topic}`, {
+                method: 'POST',
+                body: JSON.stringify(obj)
+            });
+        }
+
+        function startGame() {
+            board = new Chessboard(boardElement, {
+                position: game.fen(),
+                orientation: myColor === 'w' ? COLOR.white : COLOR.black,
+                assetsUrl: "https://cdn.jsdelivr.net/npm/cm-chessboard@8/assets/",
+                style: { pieces: { type: "standard" } }
+            });
+            board.enableMoveInput(inputHandler, myColor === 'w' ? COLOR.white : COLOR.black);
+            updateUI();
+        }
+
+        function inputHandler(event) {
+            if (game.turn() !== myColor) return false;
+            if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
+                const move = game.move({ from: event.squareFrom, to: event.squareTo, promotion: 'q' });
+                if (move) {
+                    sendMsg({ type: 'move', move: move, sender: userId });
+                    updateUI();
+                    return true;
+                }
+                return false; 
+            }
+            return true;
+        }
+
+        function updateUI() {
+            const turn = game.turn() === 'w' ? "White" : "Black";
+            turnEl.innerText = game.turn() === myColor ? "Your Turn!" : `Waiting for ${turn}...`;
+        }
+    </script>
+</body>
+</html>

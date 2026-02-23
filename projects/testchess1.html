@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual ID Chess</title>
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+.board-container { max-width: 500px; width: 100%; margin: 0 auto; }
+#messages::-webkit-scrollbar { width: 4px; }
+#messages::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+.collapsible-content { transition: max-height 0.3s ease-out; overflow: hidden; }
+.collapsed { max-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 0 !important; }
+</style>
+</head>
+<body class="bg-zinc-900 text-zinc-100 min-h-screen p-4 font-sans">
+<div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+<div class="lg:col-span-4 space-y-4">
+<div class="bg-zinc-800 p-5 rounded-2xl border border-zinc-700 shadow-xl">
+<div class="flex justify-between items-center mb-4 cursor-pointer" id="rtc-header">
+<h1 class="text-xl font-bold text-indigo-400">Connection</h1>
+<span id="conn-icon" class="text-indigo-400 font-mono text-xl">^</span>
+</div>
+<div id="conn-body" class="collapsible-content space-y-4 max-h-[500px]">
+<div id="init-actions" class="grid grid-cols-1 gap-2">
+<button id="btn-get-id" class="bg-indigo-600 hover:bg-indigo-500 py-2 rounded text-xs font-bold transition">Generate My ID</button>
+</div>
+<div id="id-display" class="hidden space-y-3">
+<div>
+<label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Your ID</label>
+<div class="flex gap-2">
+<input id="my-id" class="flex-1 bg-zinc-950 border border-zinc-700 p-2 rounded text-zinc-300 text-xs font-mono" readonly>
+<button id="btn-copy-id" class="bg-zinc-700 px-3 rounded text-[10px] font-bold">COPY</button>
+</div>
+</div>
+<div>
+<label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Join Peer ID</label>
+<div class="flex gap-2">
+<input id="peer-id-input" class="flex-1 bg-zinc-950 border border-zinc-700 p-2 rounded text-zinc-300 text-xs font-mono" placeholder="Paste ID...">
+<button id="btn-connect" class="bg-indigo-600 px-4 rounded text-xs font-bold">JOIN</button>
+</div>
+</div>
+</div>
+<div class="pt-4 border-t border-zinc-700 flex justify-between items-center">
+<span class="text-[10px] text-zinc-500 font-bold uppercase">Status</span>
+<span id="conn-status" class="text-xs font-medium text-zinc-400 italic">Offline</span>
+</div>
+</div>
+</div>
+<div class="bg-zinc-800 p-4 rounded-2xl border border-zinc-700">
+<div class="flex justify-between items-center mb-3 cursor-pointer" id="msg-header">
+<h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Messages</h2>
+<span id="msg-icon" class="text-zinc-400 font-mono text-xl">^</span>
+</div>
+<div id="msg-body" class="collapsible-content max-h-[500px]">
+<div id="messages" class="h-32 overflow-y-auto text-sm space-y-1 mb-3 pr-2 border-b border-zinc-700/50"></div>
+<div class="flex gap-2 pt-2">
+<input type="text" id="chat-input" placeholder="Text..." class="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-1 text-sm outline-none">
+<button id="btn-send" class="bg-indigo-600 px-3 py-1 rounded text-xs font-bold">Send</button>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-8 flex flex-col items-center">
+<div class="bg-zinc-800 p-5 rounded-3xl border border-zinc-700 shadow-2xl w-full max-w-[550px]">
+<div class="flex justify-between items-center mb-4">
+<div id="turn-indicator" class="px-3 py-1 rounded-full bg-zinc-950 text-[10px] font-bold border border-zinc-700">Wait...</div>
+<button id="btn-reset" class="text-[10px] text-zinc-500 hover:text-red-400 font-bold uppercase">Reset</button>
+</div>
+<div class="board-container"><div id="myBoard" class="rounded overflow-hidden border-2 border-zinc-950"></div></div>
+<p id="game-status" class="text-center mt-4 text-sm font-medium text-zinc-400 italic">Click Generate to start</p>
+</div>
+</div>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script>
+let board=null, game=new Chess(), peer=null, conn=null, playerRole=null;
+const get = id => document.getElementById(id);
+const toggle = (bI, iI) => { const b = get(bI); b.classList.toggle('collapsed'); get(iI).innerText = b.classList.contains('collapsed') ? 'v' : '^'; };
+function addLog(m, c = 'zinc-500') {
+  const msgDiv = get('messages'); const div = document.createElement('div');
+  div.className = `text-${c}`; div.textContent = m; msgDiv.appendChild(div);
+  msgDiv.scrollTop = msgDiv.scrollHeight;
+}
+function updateUI() {
+  const t = game.turn() === 'w' ? 'White' : 'Black'; const ind = get('turn-indicator');
+  ind.textContent = `${t}'s Turn`; ind.style.color = game.turn() === 'w' ? '#818cf8' : '#34d399';
+  get('game-status').textContent = game.in_checkmate() ? `Mate! ${t} loses` : game.in_draw() ? "Draw" : game.in_check() ? `${t} Check!` : "Active";
+}
+function startPeer() {
+  if (peer) return;
+  get('conn-status').textContent = 'Connecting...';
+  peer = new Peer(Math.random().toString(36).substr(2, 6).toUpperCase());
+  peer.on('open', id => {
+    get('my-id').value = id; get('conn-status').textContent = 'Online';
+    get('init-actions').classList.add('hidden'); get('id-display').classList.remove('hidden');
+    addLog("ID generated. Share it with your friend.");
+  });
+  peer.on('connection', c => {
+    if (conn) return;
+    conn = c; playerRole = 'w'; board.orientation('white'); setupConn();
+    addLog("Friend joined! You are White.", "emerald-400");
+  });
+  peer.on('error', err => { addLog("Error: " + err.type, "red-400"); get('conn-status').textContent = 'Error'; });
+}
+function setupConn() {
+  conn.on('open', () => { const st = get('conn-status'); st.textContent = 'Playing'; st.style.color = '#34d399'; updateUI(); });
+  conn.on('data', d => {
+    if(d.type==='move'){ game.move(d.move); board.position(game.fen()); updateUI(); }
+    else if(d.type==='chat'){ addLog(`Opp: ${d.text}`, 'indigo-300'); }
+    else if(d.type==='reset'){ game.reset(); board.start(); updateUI(); addLog("Game reset."); }
+  });
+}
+get('btn-get-id').onclick = startPeer;
+get('btn-connect').onclick = () => {
+  const id = get('peer-id-input').value.toUpperCase();
+  if(!id || conn) return;
+  conn = peer.connect(id); playerRole = 'b'; board.orientation('black'); setupConn();
+  addLog("Connecting to friend...", "indigo-400");
+};
+get('btn-copy-id').onclick = () => { const el = get('my-id'); el.select(); document.execCommand('copy'); addLog("ID Copied!"); };
+get('rtc-header').onclick = () => toggle('conn-body', 'conn-icon');
+get('msg-header').onclick = () => toggle('msg-body', 'msg-icon');
+function onDragStart(s, p) {
+  if (game.game_over() || !conn || game.turn() !== playerRole) return false;
+  if ((playerRole === 'w' && p.search(/^b/) !== -1) || (playerRole === 'b' && p.search(/^w/) !== -1)) return false;
+}
+function onDrop(s, t) {
+  const m = game.move({ from: s, to: t, promotion: 'q' });
+  if (!m) return 'snapback';
+  updateUI(); if (conn) conn.send({ type: 'move', move: m });
+}
+board = Chessboard('myBoard', {
+  draggable: true, position: 'start', onDragStart, onDrop,
+  onSnapEnd: () => board.position(game.fen()),
+  pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+});
+get('btn-send').onclick = () => {
+  const input = get('chat-input');
+  if (input.value && conn) {
+    conn.send({ type: 'chat', text: input.value }); addLog(`Me: ${input.value}`, 'emerald-400'); input.value = '';
+  }
+};
+get('btn-reset').onclick = () => {
+  if (confirm("Reset the board?")) {
+    game.reset(); board.start(); updateUI();
+    if (conn) conn.send({ type: 'reset' });
+  }
+};
+updateUI();
+</script>
+</body>
+</html>
