@@ -22,6 +22,95 @@
     <link rel="icon" href="/images/iopage-logo.svg" type="image/svg+xml" sizes="any">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
     <title>ioPage : Chess</title>
+    
+    <!-- Chessboard CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    
+    <style>
+        #myBoard {
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent; 
+            margin: 0 auto;
+        }
+        #myBoard img, #myBoard div {
+            outline: none !important;
+            user-select: none !important;
+            -webkit-user-select: none;
+        }
+        .chess-container {
+            padding: 20px;
+        }
+
+        /* Layout for Toggle Chat */
+        .game-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (min-width: 800px) {
+            .game-layout.with-chat {
+                flex-direction: row;
+                align-items: flex-start;
+                justify-content: center;
+            }
+            .game-layout.with-chat #chat-panel {
+                flex: 1;
+                max-width: 400px;
+                display: flex;
+                flex-direction: column;
+                height: 450px;
+            }
+            .game-layout.with-chat #messages {
+                flex-grow: 1 !important;
+                height: auto !important;
+            }
+        }
+
+        #chat-panel.hidden {
+            display: none !important;
+        }
+
+        /* Applied the requested style names */
+.ti {
+  display: flex;
+  flex-direction: row;
+    }
+.ti input,label {
+  border-radius: 5px;
+  padding: 5px;
+  margin: 5px;
+}
+.ti input {
+  border: 0.5px solid black;
+}
+.ti .tableInput {
+  color: black;
+  width: 65px;
+}
+.ti .tableSubmit {
+  color: black;
+  width: fit-content;
+  padding: 0 10px;
+}
+        button:disabled, input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #messages {
+            height: 150px; 
+            overflow-y: scroll; 
+            border: 1px solid #ccc; 
+            padding: 5px; 
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .toggle-btn {
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
   <div class="navigation-bar">
@@ -47,12 +136,190 @@
   <li><a href="/contact.html">Contact</a></li>
   </ul>
   </nav>
+
 <main>
-  <p style="margin: 25px;">
-    Nothing to see here
-  </p>
+  <div class="chess-container">
+    <h1>Chess Connection</h1>
+    
+    <div class="ti">
+        <label style="min-width: 60px;">Your ID:</label>
+        <input id="my-id" class="tableInput" readonly placeholder="">
+        <input type="submit" id="btn-id-action" value="GENERATE" class="tableSubmit">
+    </div>
+
+    <div class="ti">
+        <label style="min-width: 60px;">Join ID:</label>
+        <input id="peer-id-input" class="tableInput" placeholder="Paste ID...">
+        <input type="submit" id="btn-connect" value="JOIN" class="tableSubmit">
+    </div>
+
+    <p>Status: <span id="conn-status">Offline</span></p>
+
+    <hr>
+
+    <input type="submit" id="btn-toggle-chat" style="color: black;" value="Toggle Chat" class="tableSubmit toggle-btn">
+
+    <div id="layout-wrapper" class="game-layout with-chat">
+        <div class="board-section">
+            <div id="turn-indicator">White's Turn</div>
+            <div id="myBoard" style="width: 450px; max-width: 100%; margin-top: 10px;"></div>
+            <p id="game-status">Play offline or connect to start</p>
+            <input type="submit" id="btn-reset" style="color: black;" value="Reset Board" class="tableSubmit">
+        </div>
+
+        <div id="chat-panel" class="chat-section">
+            <hr>
+            <h3>Messages</h3>
+            <div id="messages"></div>
+            <div class="ti">
+                <input type="text" id="chat-input" placeholder="Text..." class="tableInput" style="flex-grow: 1;">
+                <input type="submit" id="btn-send" value="Send" class="tableSubmit">
+            </div>
+        </div>
+    </div>
+  </div>
 </main>
+
 <footer class="copyright"><a href="/copyright.html">© ioPage 2024, All rights reserved</a></footer>
+
+<!-- Dependencies -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="/js/script.js"></script>
+
+<script>
+    let board = null, game = new Chess(), peer = null, conn = null, playerRole = null, hasID = false;
+    const get = id => document.getElementById(id);
+
+    // Toggle Chat Visibility logic
+    get('btn-toggle-chat').onclick = () => {
+        const chatPanel = get('chat-panel');
+        const layout = get('layout-wrapper');
+        chatPanel.classList.toggle('hidden');
+        layout.classList.toggle('with-chat');
+        setTimeout(() => { board.resize(); }, 50);
+    };
+
+    function addLog(m) {
+        const msgDiv = get('messages');
+        const div = document.createElement('div');
+        div.textContent = m;
+        msgDiv.appendChild(div);
+        msgDiv.scrollTop = msgDiv.scrollHeight;
+    }
+
+    function updateUI() {
+        const t = game.turn() === 'w' ? 'White' : 'Black';
+        get('turn-indicator').textContent = t + "'s Turn";
+        get('game-status').textContent = game.in_checkmate() ? "Mate! " + t + " loses" : game.in_draw() ? "Draw" : game.in_check() ? t + " Check!" : "Active";
+    }
+
+    function handleIDAction() {
+        if (!hasID) {
+            get('conn-status').textContent = 'Connecting...';
+            peer = new Peer(Math.random().toString(36).substr(2, 6).toUpperCase());
+            peer.on('open', id => {
+                get('my-id').value = id;
+                get('conn-status').textContent = 'Online';
+                get('btn-id-action').value = 'COPY';
+                hasID = true;
+                addLog("ID ready. Share it.");
+            });
+            peer.on('connection', c => {
+                if (conn) return;
+                conn = c; playerRole = 'w'; 
+                game.reset(); 
+                board.position('start');
+                board.orientation('white'); 
+                setupConn();
+                addLog("Friend connected! You are White.");
+            });
+        } else {
+            const el = get('my-id'); el.select(); document.execCommand('copy'); addLog("ID Copied!");
+        }
+    }
+
+    function setupConn() {
+        get('btn-reset').disabled = true;
+
+        conn.on('open', () => { 
+            get('conn-status').textContent = 'Playing'; 
+            updateUI(); 
+        });
+        conn.on('data', d => {
+            if(d.type==='move'){ 
+                game.move(d.move); 
+                board.position(game.fen()); 
+                updateUI(); 
+            }
+            else if(d.type==='chat'){ addLog("Opponent: " + d.text); }
+        });
+    }
+
+    get('btn-id-action').onclick = handleIDAction;
+    get('btn-connect').onclick = () => {
+        if(!peer) { alert("Generate ID first!"); return; }
+        const id = get('peer-id-input').value.toUpperCase();
+        if(!id || conn) return;
+        conn = peer.connect(id); playerRole = 'b'; 
+        game.reset(); 
+        board.position('start');
+        board.orientation('black'); 
+        setupConn();
+        addLog("Connecting...");
+    };
+
+    function onDragStart(s, p) {
+        if (!conn) return true;
+        if (game.game_over() || game.turn() !== playerRole) return false;
+        if ((playerRole === 'w' && p.search(/^b/) !== -1) || (playerRole === 'b' && p.search(/^w/) !== -1)) return false;
+    }
+
+    function onDrop(s, t) {
+        const m = game.move({ from: s, to: t, promotion: 'q' });
+        if (!m) return 'snapback';
+        updateUI(); 
+        if (conn) conn.send({ type: 'move', move: m });
+    }
+
+    function pieceTheme(piece) {
+        return 'https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/' + piece + '.svg';
+    }
+
+    board = Chessboard('myBoard', {
+        draggable: true, 
+        position: 'start', 
+        showNotation: false,
+        onDragStart, 
+        onDrop,
+        onSnapEnd: () => board.position(game.fen()),
+        pieceTheme: pieceTheme 
+    });
+
+    // Resize listener for responsive board
+    window.addEventListener('resize', () => {
+        board.resize();
+    });
+
+    get('btn-send').onclick = () => {
+        const input = get('chat-input');
+        if (input.value && conn) {
+            conn.send({ type: 'chat', text: input.value });
+            addLog("Me: " + input.value);
+            input.value = '';
+        }
+    };
+
+    get('btn-reset').onclick = () => {
+        if (!conn) {
+            game.reset(); 
+            board.start(); 
+            updateUI();
+        }
+    };
+    updateUI();
+</script>
 </body>
 </html>
