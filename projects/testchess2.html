@@ -3,52 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Multiplayer Chess</title>
+    <title>Multiplayer Chess</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .board { width: 400px; max-width: 90vw; margin: 0 auto; }
-        #status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .status-red { background-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
-        .status-yellow { background-color: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
-        .status-green { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
-        #log-box::-webkit-scrollbar { width: 4px; }
-        #log-box::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center p-4">
 
-    <h1 class="text-3xl font-bold mb-6 text-indigo-400">Pro Chess Sync</h1>
+    <h1 class="text-3xl font-bold my-6 text-indigo-400">GitHub Chess</h1>
 
     <div class="bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-700 w-full max-w-md mb-6">
-        <div id="status-container" class="mb-4 text-center text-xs font-bold uppercase tracking-widest flex items-center justify-center">
-            <span id="status-dot" class="status-red"></span>
-            <span id="status-text">Waking up...</span>
+        <div class="mb-4 text-center text-xs font-bold uppercase tracking-widest flex items-center justify-center">
+            <span id="status-dot" class="dot bg-red-500"></span>
+            <span id="status-text">Disconnected</span>
         </div>
         
         <div class="space-y-4">
-            <div>
-                <label class="block text-xs text-slate-400 mb-1 font-bold">1. SHARE ROOM NAME</label>
-                <div class="flex gap-2">
-                    <input id="room-id" placeholder="e.g. king-side-99" class="bg-slate-900 border border-slate-600 rounded p-2 text-sm flex-grow outline-none focus:border-indigo-500">
-                    <button id="join-btn" disabled class="bg-indigo-600 hover:bg-indigo-500 px-6 py-2 rounded text-sm font-bold transition disabled:opacity-30 disabled:cursor-not-allowed">JOIN</button>
-                </div>
-            </div>
-            
-            <!-- Live Activity Log -->
-            <div class="bg-black/40 rounded p-2 border border-slate-700">
-                <p class="text-[9px] text-slate-500 font-bold mb-1 uppercase tracking-tighter">System Logs:</p>
-                <div id="log-box" class="h-16 overflow-y-auto text-[10px] font-mono text-indigo-300 space-y-1">
-                    <div>> Initializing components...</div>
-                </div>
-            </div>
+            <input id="room-id" placeholder="Enter Room Name (e.g. secret-match)" class="bg-slate-900 border border-slate-600 rounded p-2 text-sm w-full outline-none focus:border-indigo-500">
+            <button id="join-btn" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded font-bold transition disabled:opacity-30">JOIN GAME</button>
         </div>
     </div>
 
     <div id="board" class="board shadow-2xl rounded overflow-hidden"></div>
-
-    <div id="game-info" class="mt-6 text-center">
-        <p id="turn-display" class="text-xl font-semibold text-slate-400">Waiting for connection...</p>
-    </div>
+    <p id="turn-display" class="mt-6 text-xl font-semibold text-slate-400">Waiting for room...</p>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -57,156 +36,90 @@
         import { Chessboard, COLOR, INPUT_EVENT_TYPE } from "https://cdn.jsdelivr.net/npm/cm-chessboard@8/src/cm-chessboard/Chessboard.js";
         import { Chess } from "https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'chess-app';
-        
+        // Your actual Firebase keys provided:
+        const firebaseConfig = {
+            apiKey: "AIzaSyCViFJzs4K3-8sY7KiFuvnonYVjhPD81OY",
+            authDomain: "mygithubchess.firebaseapp.com",
+            projectId: "mygithubchess",
+            storageBucket: "mygithubchess.firebasestorage.app",
+            messagingSenderId: "122840137866",
+            appId: "1:122840137866:web:7247bf33f067959516ad73"
+        };
+
+        // Initialize
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        const statusText = document.getElementById("status-text");
-        const statusDot = document.getElementById("status-dot");
-        const logBox = document.getElementById("log-box");
-        const turnEl = document.getElementById("turn-display");
-        const boardElement = document.getElementById("board");
-        const roomInput = document.getElementById("room-id");
-        const joinBtn = document.getElementById("join-btn");
-
         let game = new Chess();
-        let board = null;
-        let user = null;
-        let myColor = null;
-        let roomRef = null;
-        let unsubscribe = null;
+        let board, user, myColor, roomRef, unsubscribe;
 
-        function addLog(msg) {
-            const div = document.createElement('div');
-            div.innerText = `> ${msg}`;
-            logBox.appendChild(div);
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-
-        // START AUTH
-        addLog("Requesting Anonymous Auth...");
-        statusDot.className = "status-yellow";
-        statusText.innerText = "Authenticating...";
-
-        signInAnonymously(auth).catch(err => {
-            addLog("AUTH FAILED: " + err.code);
-            statusDot.className = "status-red";
-            statusText.innerText = "Error: " + err.code;
-        });
-
+        // Login
+        signInAnonymously(auth).catch(err => console.error("Auth Error", err));
         onAuthStateChanged(auth, (u) => {
             if (u) {
                 user = u;
-                addLog("Auth Success! UID: " + u.uid.substring(0,6) + "...");
-                statusText.innerText = "Online: Ready";
-                statusDot.className = "status-green";
-                joinBtn.disabled = false;
+                document.getElementById("status-dot").className = "dot bg-green-500";
+                document.getElementById("status-text").innerText = "Online";
+                document.getElementById("join-btn").disabled = false;
             }
         });
 
-        joinBtn.onclick = async () => {
-            const roomName = roomInput.value.trim();
+        document.getElementById("join-btn").onclick = async () => {
+            const roomName = document.getElementById("room-id").value.trim();
             if (!roomName) return;
-
-            addLog(`Looking for room: ${roomName}...`);
-            joinBtn.disabled = true;
             
-            const roomPath = `/artifacts/${appId}/public/data/rooms/${roomName}`;
-            roomRef = doc(db, roomPath);
+            roomRef = doc(db, "rooms", roomName);
+            const snap = await getDoc(roomRef);
 
-            try {
-                const roomSnap = await getDoc(roomRef);
-
-                if (!roomSnap.exists()) {
-                    myColor = 'w';
-                    addLog("Creating new room...");
-                    await setDoc(roomRef, {
-                        fen: game.fen(),
-                        white: user.uid,
-                        black: null,
-                        turn: 'w'
-                    });
-                    addLog("Room created. Playing as WHITE.");
-                } else {
-                    const data = roomSnap.data();
-                    if (data.white === user.uid) {
-                        myColor = 'w';
-                        addLog("Resuming as WHITE.");
-                    } else if (!data.black || data.black === user.uid) {
-                        myColor = 'b';
-                        addLog("Joining room as BLACK.");
-                        await updateDoc(roomRef, { black: user.uid });
-                    } else {
-                        addLog("Room is full! Spectating...");
-                        myColor = 'spectator';
-                    }
-                }
-
-                initGame();
-                listenForMoves();
-            } catch (e) {
-                addLog("ROOM ERROR: " + e.message);
-                joinBtn.disabled = false;
+            if (!snap.exists()) {
+                myColor = 'w';
+                await setDoc(roomRef, { fen: game.fen(), white: user.uid, turn: 'w' });
+            } else {
+                const data = snap.data();
+                myColor = (data.white === user.uid) ? 'w' : 'b';
+                if (myColor === 'b') await updateDoc(roomRef, { black: user.uid });
             }
-        };
-
-        function listenForMoves() {
-            addLog("Syncing with database...");
-            if (unsubscribe) unsubscribe();
             
+            startChess();
+            if (unsubscribe) unsubscribe();
             unsubscribe = onSnapshot(roomRef, (doc) => {
                 const data = doc.data();
-                if (!data) return;
-
-                if (data.fen !== game.fen()) {
-                    addLog("New move received!");
+                if (data && data.fen !== game.fen()) {
                     game.load(data.fen);
-                    if (board) board.setPosition(data.fen, true);
+                    board.setPosition(data.fen, true);
                 }
                 updateUI();
-            }, (err) => {
-                addLog("SYNC ERROR: " + err.message);
             });
-        }
+        };
 
-        function initGame() {
-            board = new Chessboard(boardElement, {
+        function startChess() {
+            board = new Chessboard(document.getElementById("board"), {
                 position: game.fen(),
                 orientation: myColor === 'b' ? COLOR.black : COLOR.white,
                 assetsUrl: "https://cdn.jsdelivr.net/npm/cm-chessboard@8/assets/",
                 style: { pieces: { type: "standard" } }
             });
 
-            if (myColor !== 'spectator') {
-                board.enableMoveInput(inputHandler, myColor === 'w' ? COLOR.white : COLOR.black);
-            }
+            board.enableMoveInput(async (event) => {
+                if (game.turn() !== myColor) return false;
+                if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
+                    const move = game.move({ from: event.squareFrom, to: event.squareTo, promotion: 'q' });
+                    if (move) {
+                        await updateDoc(roomRef, { fen: game.fen(), turn: game.turn() });
+                        return true;
+                    }
+                }
+                return true;
+            }, myColor === 'w' ? COLOR.white : COLOR.black);
             updateUI();
         }
 
-        async function inputHandler(event) {
-            if (game.turn() !== myColor) return false;
-
-            if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
-                const move = game.move({ from: event.squareFrom, to: event.squareTo, promotion: 'q' });
-                if (move) {
-                    addLog("Sending move to cloud...");
-                    await updateDoc(roomRef, { fen: game.fen(), turn: game.turn() });
-                    return true;
-                }
-                return false;
-            }
-            return true;
-        }
-
         function updateUI() {
-            if (!myColor) return;
-            const turnLabel = game.turn() === 'w' ? "White" : "Black";
-            const isMyTurn = game.turn() === myColor;
-            turnEl.innerText = isMyTurn ? "Your Turn!" : `${turnLabel}'s Turn...`;
-            turnEl.className = isMyTurn ? "text-xl font-bold text-green-400" : "text-xl font-semibold text-slate-400";
+            const turn = game.turn() === 'w' ? "White" : "Black";
+            const isMe = game.turn() === myColor;
+            document.getElementById("turn-display").innerText = isMe ? "Your Turn!" : `${turn}'s Turn...`;
+            document.getElementById("turn-display").className = isMe ? "mt-6 text-xl font-bold text-green-400" : "mt-6 text-xl font-semibold text-slate-400";
         }
     </script>
 </body>
