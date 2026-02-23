@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual P2P Chess</title>
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+.board-container { max-width: 500px; width: 100%; margin: 0 auto; }
+textarea { font-family: monospace; font-size: 10px; line-height: 1.2; }
+#messages::-webkit-scrollbar { width: 4px; }
+#messages::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+.collapsible-content { transition: max-height 0.3s ease-out; overflow: hidden; }
+.collapsed { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; border-top-width: 0 !important; margin-top: 0 !important; }
+</style>
+</head>
+<body class="bg-zinc-900 text-zinc-100 min-h-screen p-4 font-sans">
+<div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+<div class="lg:col-span-4 space-y-4">
+<!-- WebRTC Section -->
+<div class="bg-zinc-800 p-5 rounded-2xl border border-zinc-700 shadow-xl">
+<div class="flex justify-between items-center mb-4 cursor-pointer" onclick="toggleSection('rtc-body', 'rtc-icon')">
+<h1 class="text-xl font-bold text-indigo-400">WebRTC Setup</h1>
+<span id="rtc-icon" class="text-indigo-400 font-mono text-xl">^</span>
+</div>
+<div id="rtc-body" class="collapsible-content space-y-4 max-h-[1000px]">
+<div>
+<label class="block text-[10px] font-bold text-zinc-500 uppercase mb-2">1. Initialize</label>
+<div class="grid grid-cols-2 gap-2">
+<button id="btn-create" class="bg-indigo-600 hover:bg-indigo-500 p-2 rounded text-xs font-bold transition">Host Game</button>
+<button id="btn-join-init" class="bg-zinc-700 hover:bg-zinc-600 p-2 rounded text-xs font-bold transition">Join Game</button>
+</div>
+</div>
+<div id="step-offer" class="hidden">
+<label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">2. Local Chain (Send this)</label>
+<textarea id="local-offer" class="w-full h-20 bg-zinc-950 border border-zinc-700 p-2 rounded text-zinc-300 mb-2" readonly></textarea>
+<button id="btn-copy-offer" class="w-full bg-zinc-700 text-[10px] py-1 rounded font-bold uppercase tracking-wider">Copy Chain</button>
+</div>
+<div id="step-remote" class="hidden">
+<label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">3. Remote Chain (Paste here)</label>
+<textarea id="remote-sdp" class="w-full h-20 bg-zinc-950 border border-zinc-700 p-2 rounded text-zinc-300 mb-2" placeholder="Paste peer data..."></textarea>
+<button id="btn-connect" class="w-full bg-emerald-600 hover:bg-emerald-500 py-2 rounded font-bold text-xs transition">CONNECT PEER</button>
+</div>
+<div class="pt-4 border-t border-zinc-700 flex justify-between items-center">
+<span class="text-[10px] text-zinc-500 font-bold uppercase">Status</span>
+<span id="conn-status" class="text-xs font-medium text-zinc-400">Disconnected</span>
+</div>
+</div>
+</div>
+<!-- Message Section -->
+<div class="bg-zinc-800 p-4 rounded-2xl border border-zinc-700">
+<div class="flex justify-between items-center mb-3 cursor-pointer" onclick="toggleSection('msg-body', 'msg-icon')">
+<h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">Messages</h2>
+<span id="msg-icon" class="text-zinc-400 font-mono text-xl">^</span>
+</div>
+<div id="msg-body" class="collapsible-content max-h-[500px]">
+<div id="messages" class="h-32 overflow-y-auto text-sm space-y-1 mb-3 pr-2"></div>
+<div class="flex gap-2">
+<input type="text" id="chat-input" placeholder="Message..." class="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-1 text-sm outline-none">
+<button id="btn-send" class="bg-indigo-600 px-3 py-1 rounded text-xs font-bold">Send</button>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-8 flex flex-col items-center">
+<div class="bg-zinc-800 p-5 rounded-3xl border border-zinc-700 shadow-2xl w-full max-w-[550px]">
+<div class="flex justify-between items-center mb-4">
+<div id="turn-indicator" class="px-3 py-1 rounded-full bg-zinc-950 text-[10px] font-bold border border-zinc-700">Wait...</div>
+<button id="btn-reset" class="text-[10px] text-zinc-500 hover:text-red-400 font-bold uppercase">Reset</button>
+</div>
+<div class="board-container"><div id="myBoard" class="rounded overflow-hidden border-2 border-zinc-950"></div></div>
+<p id="game-status" class="text-center mt-4 text-sm font-medium text-zinc-400 italic">Ready to connect</p>
+</div>
+</div>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script>
+let board=null, game=new Chess(), pc=null, channel=null, playerRole=null;
+const config={ iceServers:[{ urls:'stun:stun.l.google.com:19302' }] };
+function toggleSection(bodyId, iconId) {
+  const body = document.getElementById(bodyId);
+  const icon = document.getElementById(iconId);
+  body.classList.toggle('collapsed');
+  icon.innerText = body.classList.contains('collapsed') ? 'v' : '^';
+}
+function addLog(m,c='zinc-500'){
+  $('#messages').append(`<div class="text-${c}">${m}</div>`);
+  $('#messages').scrollTop($('#messages')[0].scrollHeight);
+}
+function updateUI(){
+  const t=game.turn()==='w'?'White':'Black';
+  $('#turn-indicator').text(`${t}'s Turn`).css('color',game.turn()==='w'?'#818cf8':'#34d399');
+  let s='';
+  if(game.in_checkmate()) s=`Mate! ${t} loses.`;
+  else if(game.in_draw()) s="Draw Game";
+  else if(game.in_check()) s=`${t} in check!`;
+  else s="Game Active";
+  $('#game-status').text(s);
+}
+function initPeer(h){
+  pc=new RTCPeerConnection(config);
+  pc.onicecandidate=e=>{
+    if(!e.candidate){
+      $('#local-offer').val(JSON.stringify(pc.localDescription));
+      addLog("Local data ready. Copy it!","indigo-400");
+    }
+  };
+  pc.onconnectionstatechange=()=>{
+    const s=pc.connectionState;
+    $('#conn-status').text(s).css('color',s==='connected'?'#34d399':'#71717a');
+    if(s==='connected') {
+      addLog("Connected!","emerald-400");
+      setTimeout(() => toggleSection('rtc-body', 'rtc-icon'), 1000);
+    }
+  };
+  if(h){
+    channel=pc.createDataChannel('game');
+    bind();
+  } else {
+    pc.ondatachannel=e=>{ channel=e.channel; bind(); };
+  }
+}
+function bind(){
+  channel.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    if(d.type==='move'){
+      game.move(d.move);
+      board.position(game.fen());
+      updateUI();
+    } else if(d.type==='chat'){
+      addLog(`Opponent: ${d.text}`,'indigo-300');
+    } else if(d.type==='reset'){
+      game.reset(); board.start(); updateUI();
+      addLog("Reset by opponent","zinc-500");
+    }
+  };
+}
+$('#btn-create').click(async()=>{
+  playerRole='w'; board.orientation('white');
+  initPeer(true);
+  const o=await pc.createOffer();
+  await pc.setLocalDescription(o);
+  $('#step-offer, #step-remote').removeClass('hidden');
+  addLog("Offer generated...");
+});
+$('#btn-join-init').click(()=>{
+  playerRole='b'; board.orientation('black');
+  initPeer(false);
+  $('#step-remote').removeClass('hidden');
+  addLog("Paste the Host's data below.");
+});
+$('#btn-connect').click(async()=>{
+  const r=$('#remote-sdp').val();
+  if(!r) return;
+  const d=JSON.parse(r);
+  await pc.setRemoteDescription(new RTCSessionDescription(d));
+  if(playerRole==='b'&&!pc.localDescription){
+    const a=await pc.createAnswer();
+    await pc.setLocalDescription(a);
+    $('#step-offer').removeClass('hidden');
+    $('#local-offer').val(JSON.stringify(pc.localDescription));
+    addLog("Answer ready. Send back to Host!");
+  }
+});
+$('#btn-copy-offer').click(()=>{
+  const t=document.getElementById("local-offer");
+  t.select();
+  document.execCommand("copy");
+  addLog("Copied to clipboard.","zinc-500");
+});
+function onDragStart(s,p){
+  if(game.game_over()||!pc||pc.connectionState!=='connected'||game.turn()!==playerRole) return false;
+  if((playerRole==='w'&&p.search(/^b/)!==-1)||(playerRole==='b'&&p.search(/^w/)!==-1)) return false;
+}
+function onDrop(s,t){
+  const m=game.move({from:s,to:t,promotion:'q'});
+  if(!m) return 'snapback';
+  updateUI();
+  if(channel?.readyState==='open') channel.send(JSON.stringify({type:'move',move:m}));
+}
+board=Chessboard('myBoard',{
+  draggable:true, position:'start', onDragStart, onDrop,
+  onSnapEnd:()=>board.position(game.fen()),
+  pieceTheme:'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+});
+$('#btn-send').click(()=>{
+  const t=$('#chat-input').val();
+  if(t&&channel?.readyState==='open'){
+    channel.send(JSON.stringify({type:'chat',text:t}));
+    addLog(`You: ${t}`,'emerald-400');
+    $('#chat-input').val('');
+  }
+});
+$('#btn-reset').click(()=>{
+  if(confirm("Reset?")){
+    game.reset(); board.start(); updateUI();
+    if(channel?.readyState==='open') channel.send(JSON.stringify({type:'reset'}));
+  }
+});
+updateUI();
+</script>
+</body>
+</html>
