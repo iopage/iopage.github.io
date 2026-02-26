@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Connect 4 - Pro</title>
+    <link rel="stylesheet" href="c4.css">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <!-- Game View -->
+    <div id="game-view" class="hidden container">
+        <div class="header">
+            <div id="timer-top" class="timer-box timer-inactive">
+                <div class="timer-val" id="time-top-val">05:00</div>
+            </div>
+            <div id="timer-bottom" class="timer-box timer-inactive">
+                <div class="timer-val" id="time-bottom-val">05:00</div>
+            </div>
+        </div>
+        <div id="main-grid" class="c4-board"></div>
+        <div id="turn-indicator" class="status-text">Waiting...</div>
+        <div class="footer">
+            <button onclick="location.reload()" class="btn-text">Leave Match</button>
+        </div>
+    </div>
+    <!-- Setup View -->
+    <div id="setup-view" class="setup-card">
+        <div class="setup-header">
+            <h1>Connect 4</h1>
+        </div>
+        <div id="connection-controls">
+            <div class="setup-grid">
+                <div class="control-group">
+                    <label class="label">Host a Room</label>
+                    <div id="id-actions">
+                        <button id="gen-id-btn" onclick="initPeer(true)" class="btn-primary">Create Room</button>
+                    </div>
+                    <div class="hidden flex-row" id="id-display">
+                        <input id="my-id" type="text" readonly class="input-id">
+                        <button id="copy-btn" onclick="copyId()" class="btn-secondary">Copy</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label class="label">Join Friend</label>
+                    <div class="flex-row">
+                        <input id="peer-id" type="text" class="input-join" placeholder="">
+                        <button id="connect-btn" onclick="handleJoin()" class="btn-green">Join</button>
+                    </div>
+                </div>
+            </div>
+            <div id="status" class="status-pill">Status: Offline</div>
+        </div>
+        <div id="host-lobby" class="hidden lobby-section">
+            <h3 class="lobby-title">Game Settings</h3>
+            
+            <div class="setting-row">
+                <div class="flex-between">
+                    <label class="label">Base Time</label>
+                    <span id="time-val-display" class="value-badge">5 MIN</span>
+                </div>
+                <input id="time-slider" type="range" min="1" max="10" value="5" class="slider" oninput="updateSliderLabels()">
+            </div>
+            <div class="setting-row">
+                <div class="flex-between">
+                    <label class="label">Increment</label>
+                    <span id="inc-val-display" class="value-badge">3 SEC</span>
+                </div>
+                <input id="inc-slider" type="range" min="0" max="10" value="3" class="slider" oninput="updateSliderLabels()">
+            </div>
+            <div id="side-select-group">
+                <label class="label margin-bottom">Starting Color (Red starts)</label>
+                <div class="grid-2">
+                    <button onclick="setStarter('host')" id="btn-start-me" class="btn-choice active">Host Starts</button>
+                    <button onclick="setStarter('peer')" id="btn-start-peer" class="btn-choice">Guest Starts</button>
+                </div>
+            </div>
+            <button id="start-game-btn" class="btn-primary btn-large">Start Match</button>
+        </div>
+    </div>
+    <script src="c4.js"></script>
+</body>
+</html>

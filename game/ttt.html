@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Super Tic-Tac-Toe Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .grid-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+        .cell { 
+            aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; 
+            font-weight: 800; cursor: pointer; transition: none; font-size: 1.1rem;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Background color change on click removed */
+        
+        .board-active { 
+            z-index: 10; 
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.5), 0 0 12px rgba(34, 197, 94, 0.2);
+            background-color: #f0fdf4;
+        }
+        
+        .turn-pulse { animation: pulse-green-tight 2.5s infinite ease-in-out; }
+        @keyframes pulse-green-tight {
+            0% { box-shadow: 0 0 6px rgba(34, 197, 94, 0.4), 0 0 10px rgba(34, 197, 94, 0.1); }
+            50% { box-shadow: 0 0 12px rgba(34, 197, 94, 0.7), 0 0 18px rgba(34, 197, 94, 0.2); }
+            100% { box-shadow: 0 0 6px rgba(34, 197, 94, 0.4), 0 0 10px rgba(34, 197, 94, 0.1); }
+        }
+
+        .board-won-x { background-color: #fee2e2 !important; }
+        .board-won-o { background-color: #dcfce7 !important; }
+        .big-mark { position: absolute; font-size: 3.5rem; font-weight: 900; opacity: 0.3; pointer-events: none; z-index: 20; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; top: 0; left: 0; }
+        .occupied { cursor: not-allowed; }
+        
+        .timer-box {
+            width: 100px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid black;
+            border-radius: 0 !important;
+            transition: all 0.2s ease-in-out;
+        }
+        .timer-val {
+            font-weight: 900;
+            font-size: 1.4rem;
+            letter-spacing: -0.05em;
+        }
+        .timer-active {
+            background-color: black;
+            color: white;
+            border-color: black;
+            transform: scale(1.05);
+        }
+        .timer-inactive {
+            background-color: white;
+            color: #94a3b8;
+            border-color: #94a3b8;
+            opacity: 0.6;
+        }
+
+        #main-grid, #setup-view {
+            box-shadow: none !important;
+            border: 2px solid #e2e8f0;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #0f172a;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center p-4 text-slate-900 overflow-x-hidden">
+
+    <!-- Game View -->
+<div id="game-view" class="hidden w-full max-w-[420px] flex flex-col transition-opacity duration-500">
+        <div class="flex justify-start w-full mb-3">
+            <div id="timer-top" class="timer-box timer-inactive">
+                <div class="timer-val" id="time-top-val">05:00</div>
+            </div>
+        </div>
+
+        <div id="main-grid" class="grid grid-cols-3 gap-1.5 bg-slate-300 p-1.5 rounded-2xl w-full aspect-square"></div>
+
+        <div class="flex justify-end w-full mt-3 mb-4">
+            <div id="timer-bottom" class="timer-box timer-inactive">
+                <div class="timer-val" id="time-bottom-val">05:00</div>
+            </div>
+        </div>
+        
+        <div id="turn-indicator" class="text-center text-xl font-black text-slate-800 tracking-tight uppercase mt-4">Waiting...</div>
+        <button onclick="location.reload()" class="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500">Exit Match</button>
+    </div>
+
+    <!-- Setup View -->
+<div id="setup-view" class="w-full max-w-md bg-white p-8 rounded-3xl border border-slate-200 mt-10">
+        <!-- Title text removed -->
+        <div id="connection-controls" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex flex-col">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Host Room</label>
+                    <div id="id-actions">
+                        <button id="gen-id-btn" onclick="initPeer(true)" class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-[11px] uppercase hover:bg-blue-700 transition active:scale-95">Create Room</button>
+                    </div>
+                    <div class="hidden flex gap-1 mt-1" id="id-display">
+                        <input id="my-id" type="text" readonly class="flex-1 bg-slate-50 border p-2 rounded-lg text-sm font-bold text-center text-blue-600 outline-none min-w-0">
+                        <button id="copy-btn" onclick="copyId()" class="bg-slate-800 text-white px-3 py-2 rounded-lg font-bold text-[10px] uppercase w-16">Copy</button>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Join Friend</label>
+                    <div class="flex gap-1 mt-auto">
+                        <input id="peer-id" type="text" class="flex-1 border p-2 rounded-lg text-sm font-bold text-center uppercase outline-none focus:border-blue-400 min-w-0" placeholder="CODE">
+                        <button id="connect-btn" onclick="handleJoin()" class="bg-emerald-500 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase hover:bg-emerald-600 transition active:scale-95 w-16">Join</button>
+                    </div>
+                </div>
+            </div>
+            <div id="status" class="text-center text-[10px] font-black text-slate-400 tracking-widest uppercase py-2 bg-slate-50 rounded-lg">Status: Offline</div>
+        </div>
+
+        <div id="host-lobby" class="hidden border-t border-slate-100 mt-8 pt-6 space-y-6">
+            <h3 id="lobby-label" class="text-[11px] font-black text-slate-900 uppercase text-center mb-2 tracking-widest">Match Configuration</h3>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Base Time</label>
+                        <span id="time-val-display" class="text-xs font-black text-blue-600">5 MIN</span>
+                    </div>
+                    <input id="time-slider" type="range" min="1" max="10" value="5" oninput="updateSliderLabels()">
+                </div>
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Increment</label>
+                        <span id="inc-val-display" class="text-xs font-black text-blue-600">3 SEC</span>
+                    </div>
+                    <input id="inc-slider" type="range" min="0" max="10" value="3" oninput="updateSliderLabels()">
+                </div>
+            </div>
+            <div id="side-select-group">
+                <label class="text-[10px] font-bold text-slate-400 uppercase block mb-3">Starting Side (X goes first)</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setStarter('host')" id="btn-start-me" class="py-2 border-2 border-slate-900 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase transition">Me</button>
+                    <button onclick="setStarter('peer')" id="btn-start-peer" class="py-2 border-2 border-slate-200 bg-white text-slate-400 rounded-xl text-[11px] font-black uppercase transition">Opponent</button>
+                </div>
+            </div>
+            <button id="start-game-btn" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition shadow-lg shadow-blue-200">Start Match</button>
+        </div>
+    </div>
+
+<script>
+        const Game = {
+            boards: Array(9).fill(null).map(() => Array(9).fill(null)),
+            globalBoard: Array(9).fill(null),
+            currentPlayer: 'X',
+            nextBoardIdx: null,
+            winner: null,
+            clocks: { X: 300, O: 300 },
+            increment: 0,
+            timerId: null,
+            isStarted: false,
+            isLocal: false,
+
+            checkWin(cells) {
+                const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+                for (let [a, b, c] of wins) {
+                    if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) return cells[a];
+                }
+                return cells.includes(null) ? null : 'Draw';
+            },
+
+            makeMove(boardIdx, cellIdx) {
+                if (this.winner) return false;
+                if (this.nextBoardIdx !== null && boardIdx !== this.nextBoardIdx) return false;
+                if (this.globalBoard[boardIdx] || this.boards[boardIdx][cellIdx]) return false;
+                this.boards[boardIdx][cellIdx] = this.currentPlayer;
+                const miniWin = this.checkWin(this.boards[boardIdx]);
+                if (miniWin) this.globalBoard[boardIdx] = miniWin === 'Draw' ? 'D' : miniWin;
+                this.winner = this.checkWin(this.globalBoard);
+                this.nextBoardIdx = (this.globalBoard[cellIdx] || !this.boards[cellIdx].includes(null)) ? null : cellIdx;
+                if (this.isStarted) this.clocks[this.currentPlayer] += this.increment;
+                this.currentPlayer = this.currentPlayer === 'X' ? 'O' : 'X';
+                return true;
+            },
+
+            reset() {
+                this.boards = Array(9).fill(null).map(() => Array(9).fill(null));
+                this.globalBoard = Array(9).fill(null);
+                this.currentPlayer = 'X';
+                this.nextBoardIdx = null;
+                this.winner = null;
+                this.clocks = { X: 300, O: 300 };
+                this.isStarted = false;
+                if (this.timerId) clearInterval(this.timerId);
+            }
+        };
+
+        let peer, conn, mySymbol = null, isHost = false, hostStartingAs = 'X';
+
+        function updateSliderLabels() {
+            document.getElementById('time-val-display').innerText = `${document.getElementById('time-slider').value} MIN`;
+            document.getElementById('inc-val-display').innerText = `${document.getElementById('inc-slider').value} SEC`;
+        }
+
+        function setStarter(who) {
+            const meBtn = document.getElementById('btn-start-me');
+            const peerBtn = document.getElementById('btn-start-peer');
+            if (who === 'host') {
+                hostStartingAs = 'X';
+                meBtn.className = "py-2 border-2 border-slate-900 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase";
+                peerBtn.className = "py-2 border-2 border-slate-200 bg-white text-slate-400 rounded-xl text-[11px] font-black uppercase";
+            } else {
+                hostStartingAs = 'O';
+                peerBtn.className = "py-2 border-2 border-slate-900 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase";
+                meBtn.className = "py-2 border-2 border-slate-200 bg-white text-slate-400 rounded-xl text-[11px] font-black uppercase";
+            }
+        }
+
+        function initPeer(showId = false) {
+            return new Promise((resolve) => {
+                if (peer) return resolve(peer);
+                const idBtn = document.getElementById('gen-id-btn');
+                if (showId) idBtn.innerText = "LINKING...";
+                const id = Math.random().toString(36).substr(2, 5).toUpperCase();
+                peer = new Peer(id);
+                peer.on('open', sid => {
+                    if (showId) {
+                        document.getElementById('my-id').value = sid;
+                        idBtn.parentElement.classList.add('hidden');
+                        document.getElementById('id-display').classList.remove('hidden');
+                        document.getElementById('status').innerText = "ROOM READY";
+                        document.getElementById('status').className = "text-center text-[10px] font-black text-blue-500 tracking-widest uppercase py-2 bg-blue-50 rounded-lg";
+                    }
+                    resolve(peer);
+                });
+                peer.on('connection', c => {
+                    if (conn) return c.close();
+                    conn = c; isHost = true;
+                    document.getElementById('host-lobby').classList.remove('hidden');
+                    document.getElementById('status').innerText = "OPPONENT JOINED";
+                    document.getElementById('status').className = "text-center text-[10px] font-black text-emerald-500 tracking-widest uppercase py-2 bg-emerald-50 rounded-lg";
+                    setupConnection();
+                });
+            });
+        }
+
+        async function handleJoin() {
+            const targetId = document.getElementById('peer-id').value.toUpperCase();
+            const myId = document.getElementById('my-id').value.toUpperCase();
+            if (!targetId) return;
+            if (myId && targetId === myId) {
+                Game.isLocal = true; isHost = true;
+                document.getElementById('lobby-label').innerText = "Local Match Setup";
+                document.getElementById('side-select-group').classList.add('hidden');
+                document.getElementById('host-lobby').classList.remove('hidden');
+                document.getElementById('status').innerText = "LOCAL MODE ACTIVE";
+                document.getElementById('status').className = "text-center text-[10px] font-black text-purple-500 tracking-widest uppercase py-2 bg-purple-50 rounded-lg";
+                return;
+            }
+            document.getElementById('status').innerText = "INITIALIZING...";
+            await initPeer(false);
+            document.getElementById('status').innerText = "CONNECTING...";
+            conn = peer.connect(targetId);
+            isHost = false;
+            setupConnection();
+        }
+
+        function setupConnection() {
+            conn.on('open', () => { 
+                document.getElementById('status').innerText = isHost ? "FRIEND CONNECTED" : "LOBBY JOINED";
+                document.getElementById('status').className = "text-center text-[10px] font-black text-emerald-500 tracking-widest uppercase py-2 bg-emerald-50 rounded-lg";
+            });
+            conn.on('data', d => {
+                if (d.type === 'START') beginMatch(d);
+                if (d.type === 'MOVE') { Game.makeMove(d.boardIdx, d.cellIdx); render(); }
+            });
+        }
+
+        function beginMatch(config) {
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
+            Game.reset();
+            const baseSeconds = config.time * 60;
+            Game.clocks.X = baseSeconds; Game.clocks.O = baseSeconds;
+            Game.increment = config.inc; Game.isStarted = true;
+            if (Game.isLocal) { mySymbol = 'LOCAL'; } else { mySymbol = isHost ? config.hostSymbol : (config.hostSymbol === 'X' ? 'O' : 'X'); }
+            startClock(); render();
+        }
+
+        document.getElementById('start-game-btn').onclick = () => {
+            const config = { type: 'START', time: parseInt(document.getElementById('time-slider').value), inc: parseInt(document.getElementById('inc-slider').value), hostSymbol: hostStartingAs };
+            if (!Game.isLocal && conn) conn.send(config);
+            beginMatch(config);
+        };
+
+        function startClock() {
+            if (Game.timerId) clearInterval(Game.timerId);
+            Game.timerId = setInterval(() => {
+                if (Game.winner) return clearInterval(Game.timerId);
+                Game.clocks[Game.currentPlayer]--;
+                if (Game.clocks[Game.currentPlayer] <= 0) { Game.winner = Game.currentPlayer === 'X' ? 'O' : 'X'; clearInterval(Game.timerId); }
+                updateClockUI();
+            }, 1000);
+        }
+
+        function updateClockUI() {
+            const fmt = s => { if (s < 0) return "00:00"; const m = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); return `${m}:${sec}`; };
+            let pTime, oTime, isTopActive;
+            if (Game.isLocal) { oTime = Game.clocks.O; pTime = Game.clocks.X; isTopActive = Game.currentPlayer === 'O'; } 
+            else { pTime = Game.clocks[mySymbol]; const oSymbol = mySymbol === 'X' ? 'O' : 'X'; oTime = Game.clocks[oSymbol]; isTopActive = Game.currentPlayer !== mySymbol; }
+            document.getElementById('time-bottom-val').innerText = fmt(pTime); document.getElementById('time-top-val').innerText = fmt(oTime);
+            document.getElementById('timer-top').className = `timer-box ${isTopActive ? 'timer-active' : 'timer-inactive'}`;
+            document.getElementById('timer-bottom').className = `timer-box ${!isTopActive ? 'timer-active' : 'timer-inactive'}`;
+        }
+
+        function render() {
+            updateClockUI();
+            const container = document.getElementById('main-grid');
+            container.innerHTML = '';
+            const isMyTurn = Game.isLocal || Game.currentPlayer === mySymbol;
+            const turnInd = document.getElementById('turn-indicator');
+            if (Game.winner) {
+                if (Game.isLocal) { turnInd.innerText = Game.winner === 'Draw' ? "DRAW" : `${Game.winner} WINS`; } 
+                else { const isIWin = Game.winner === mySymbol; turnInd.innerText = Game.winner === 'Draw' ? "DRAW" : (isIWin ? "VICTORY" : "DEFEAT"); }
+                turnInd.className = "text-center text-3xl font-black text-purple-600 tracking-tighter uppercase mt-4 italic";
+            } else {
+                if (Game.isLocal) { turnInd.innerText = `PLAYER ${Game.currentPlayer}'s TURN`; } 
+                else { turnInd.innerText = isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"; }
+                turnInd.className = `text-center text-xl font-black tracking-tight uppercase mt-4 ${Game.currentPlayer === 'X' ? 'text-red-500' : 'text-emerald-500'}`;
+            }
+            for (let b = 0; b < 9; b++) {
+                const bDiv = document.createElement('div');
+                bDiv.className = `grid-mini p-0.5 bg-white rounded-xl relative transition-all`;
+                if (!Game.winner && !Game.globalBoard[b] && (Game.nextBoardIdx === null || Game.nextBoardIdx === b)) { bDiv.classList.add('board-active'); if (isMyTurn) bDiv.classList.add('turn-pulse'); }
+                if (Game.globalBoard[b]) {
+                    bDiv.classList.add(Game.globalBoard[b] === 'X' ? 'board-won-x' : (Game.globalBoard[b] === 'O' ? 'board-won-o' : 'bg-slate-50'));
+                    const mark = document.createElement('div');
+                    mark.className = `big-mark ${Game.globalBoard[b] === 'X' ? 'text-red-500' : 'text-emerald-500'}`;
+                    mark.innerText = Game.globalBoard[b] === 'D' ? '—' : Game.globalBoard[b];
+                    bDiv.appendChild(mark);
+                }
+                for (let c = 0; c < 9; c++) {
+                    const cDiv = document.createElement('div');
+                    const val = Game.boards[b][c];
+                    cDiv.className = `cell ${val ? 'occupied' : 'bg-transparent'}`;
+                    cDiv.innerText = val || '';
+                    if (val === 'X') cDiv.classList.add('text-red-500');
+                    if (val === 'O') cDiv.classList.add('text-emerald-500');
+                    cDiv.onclick = () => { if (isMyTurn && Game.makeMove(b, c)) { if (!Game.isLocal && conn) conn.send({ type: 'MOVE', boardIdx: b, cellIdx: c }); render(); } };
+                    bDiv.appendChild(cDiv);
+                }
+                container.appendChild(bDiv);
+            }
+        }
+
+        async function copyId() {
+            const input = document.getElementById('my-id');
+            const btn = document.getElementById('copy-btn');
+            const textToCopy = input.value;
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed"; textArea.style.left = "-9999px"; textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus(); textArea.select(); textArea.setSelectionRange(0, 99999);
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (successful) {
+                    btn.innerText = "DONE!";
+                    btn.className = "bg-emerald-500 text-white px-3 py-2 rounded-lg font-bold text-[10px] uppercase transition-colors w-16";
+                    setTimeout(() => { btn.innerText = "COPY"; btn.className = "bg-slate-800 text-white px-3 py-2 rounded-lg font-bold text-[10px] uppercase w-16"; }, 1500);
+                }
+            } catch (err) { console.error('Manual copy failed', err); }
+        }
+
+        window.onload = updateSliderLabels;
+    </script>
+</body>
+</html>
