@@ -1,4 +1,4 @@
 User-agent: *
-Disallow: 
-Disallow: /cgi-bin/
+Allow: /
+
 Sitemap: https://iopage.github.io/sitemap.xml
