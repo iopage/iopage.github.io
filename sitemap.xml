@@ -8,38 +8,78 @@
 
 <url>
   <loc>https://iopage.github.io/</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>1.00</priority>
 </url>
 <url>
   <loc>https://iopage.github.io/about.html</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>0.80</priority>
 </url>
 <url>
-  <loc>https://iopage.github.io/projects.html</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <loc>https://iopage.github.io/projects-page.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>0.80</priority>
 </url>
 <url>
   <loc>https://iopage.github.io/articles.html</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>0.80</priority>
 </url>
 <url>
   <loc>https://iopage.github.io/contact.html</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>0.80</priority>
 </url>
 <url>
-  <loc>https://iopage.github.io/projects/googlehomepage-replica.html</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <loc>https://iopage.github.io/projects/google-homepage-replica.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/projects/table-gen.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/articles/remove-html.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/games.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>0.80</priority>
 </url>
 <url>
   <loc>https://iopage.github.io/copyright.html</loc>
-  <lastmod>2024-05-10T13:13:43+00:00</lastmod>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
   <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/projects/pythagorean.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/c.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/tc.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/ttt.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/c4.html</loc>
+  <lastmod>2026-03-08T10:11:27+00:00</lastmod>
+  <priority>0.64</priority>
 </url>
 
 
