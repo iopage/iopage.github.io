@@ -135,8 +135,8 @@ input:-webkit-autofill {
       <img src="https://www.freepnglogos.com/uploads/google-logo-png/file-google-logo-svg-wikimedia-commons-23.png" alt="Google">
     </div>
     <div class="sb">
-      <img src="/images/img/gsearch.jpg" alt="Google Search" onclick="urlConvert()">
-      <input type="text" id="sq" onkeydown="enter(event)">
+      <img src="/images/img/gsearch.jpg" alt="Google Search" onclick="Displayprompt()">
+      <input type="text" id="sq" onkeydown="Displayprompt()">
       <img src="/images/img/gmic.png" alt="Google Mic">
        <img src="/images/img/glens.png" alt="Google Lens">
     </div>
@@ -154,8 +154,9 @@ input:-webkit-autofill {
         <span>About</span>
       </span></div>
 </div>
-  <script>
-    function urlConvert() {
+<script>
+  /*
+  function urlConvert() {
   let search = document.getElementById("sq").value;
   let queryPlus = search.replace(/\+/g, '%2B');
   let querySpace = queryPlus.replace(/ /g, '+');
@@ -166,6 +167,10 @@ function enter(event) {
   if (event.key === "Enter") {
     urlConvert();
   }
+}
+*/
+function Displayprompt() {
+  alert("Earlier this feature was working. But now it has been discontinued");
 }
   </script>
 </body>
