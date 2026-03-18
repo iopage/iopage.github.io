@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+<url>
+  <loc>https://iopage.github.io/</loc>
+  <priority>1.00</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/about</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/projects-page</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/articles</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/contact</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/projects/google-homepage-replica</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/projects/table-gen</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/articles/remove-html</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/games</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/copyright</loc>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/projects/pythagorean</loc>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/c</loc>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/tc</loc>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/ttt</loc>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://iopage.github.io/game/c4</loc>
+  <priority>0.64</priority>
+</url>
+
+</urlset>
