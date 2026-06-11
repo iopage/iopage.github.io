@@ -1,1 +1,102 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Infinite Tic-Tac-Toe Engine</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body class="bg-white text-black min-h-screen flex flex-col p-6">
+<header class="max-w-xs mx-auto w-full flex flex-col gap-3 mb-6">
+<div class="flex border border-black rounded p-0.5 text-xs font-mono">
+<button id="mode-ai" onclick="setMode('ai')" class="flex-1 py-1 text-center font-bold bg-black text-white">VS AI</button>
+<button id="mode-local" onclick="setMode('local')" class="flex-1 py-1 text-center">LOCAL</button>
+<button id="mode-online" onclick="setMode('online')" class="flex-1 py-1 text-center">ONLINE</button>
+</div>
+<div id="online-panel" class="hidden border border-black p-3 rounded font-mono text-xs flex-col gap-2 bg-gray-50">
+<div class="flex justify-between items-center">
+<span class="text-[10px] font-bold text-gray-500 uppercase">Your ID:</span>
+<span id="my-peer-id" class="font-bold tracking-wider text-blue-600">....</span>
+<button onclick="copyPeerID()" id="btn-copy" class="border border-black px-2 py-0.5 hover:bg-gray-200 bg-white font-bold text-[10px]">COPY</button>
+</div>
+<div class="flex gap-1 pt-1">
+<input type="text" id="join-peer-id" placeholder="FRIEND ID" class="border border-black px-2 py-1 flex-1 tracking-wider uppercase outline-none text-xs text-center font-bold">
+<button onclick="connectToPeer()" class="border border-black px-4 py-1 hover:bg-black hover:text-white transition-colors font-bold bg-white">JOIN</button>
+</div>
+<div id="connection-status" class="text-center font-bold text-gray-500 py-1 uppercase tracking-wider text-[10px]">OFFLINE</div>
+</div>
+<div class="flex justify-between items-center text-xs font-mono border-b border-black pb-2">
+<span id="status-left">YOU (X)</span>
+<button id="eval-toggle" onclick="toggleEval()" class="border border-black px-2 py-0.5 hover:bg-gray-100 font-bold">EVAL: OFF</button>
+<span id="status-right"></span>
+</div>
+<div class="text-center font-mono text-xs font-bold py-1 bg-gray-100 border border-black/10 rounded">
+<span id="turn-indicator">YOUR TURN</span>
+</div>
+</header>
+<main class="max-w-xs mx-auto w-full">
+<div class="grid grid-cols-3 grid-rows-3 gap-2 aspect-square w-full">
+<button data-cell="0" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="1" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="2" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="3" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="4" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="5" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="6" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="7" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+<button data-cell="8" class="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"></button>
+</div>
+</main>
+<footer class="max-w-xs mx-auto w-full mt-6 flex flex-col gap-3">
+<div id="cpu-panel" class="border border-black p-3 rounded font-mono text-xs flex flex-col gap-2 bg-gray-50">
+<div class="flex items-center justify-between">
+<span>CPU DEPTH:</span>
+<div class="flex items-center gap-1.5">
+<button onclick="changeDepth(-1)" class="border border-black w-6 h-6 flex items-center justify-center hover:bg-gray-200 bg-white font-bold transition-colors select-none">&lt;</button>
+<span id="cpu-label" class="font-bold min-w-[110px] text-center uppercase tracking-tight text-[11px] h-6 flex items-center justify-center">MEDIUM (D5)</span>
+<button onclick="changeDepth(1)" class="border border-black w-6 h-6 flex items-center justify-center hover:bg-gray-200 bg-white font-bold transition-colors select-none">&gt;</button>
+</div>
+</div>
+</div>
+<button id="btn-reset" onclick="triggerReset()" class="border border-black py-2 text-xs font-mono font-bold hover:bg-gray-100 transition-colors uppercase w-full">Reset Board</button>
+</footer>
+<div id="game-alert" class="fixed inset-0 bg-white/90 z-50 flex flex-col items-center justify-center gap-4 hidden">
+<div class="text-4xl font-mono font-bold" id="alert-title">X WINS</div>
+<button onclick="closeAlert()" class="border border-black px-6 py-2 font-mono text-sm font-bold hover:bg-gray-100">PLAY AGAIN</button>
+</div>
+<script id="worker-script" type="application/javascript-worker">
+function checkWin(player,board){const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];const winningLine=wins.find(line=>line.every(idx=>board[idx]===player));return winningLine||null}
+function simulatePlacement(simBoard,queue,player,index){const nextQueue=[...queue];if(nextQueue.length>=3){const oldest=nextQueue.shift();simBoard[oldest]=null}nextQueue.push(index);simBoard[index]=player;return nextQueue}
+function evaluateStaticPositional(simBoard,xMoves,oMoves,turn){let score=0;if(simBoard[4]==='X')score+=1.5;if(simBoard[4]==='O')score-=1.5;const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];lines.forEach(line=>{const countX=line.filter(idx=>simBoard[idx]==='X').length;const countO=line.filter(idx=>simBoard[idx]==='O').length;if(countX>0&&countO===0)score+=countX*0.4;if(countO>0&&countX===0)score-=countO*0.4});if(xMoves.length===3&&turn==='X')score-=0.6;if(oMoves.length===3&&turn==='O')score+=0.6;return score}
+function minimax(simBoard,xQ,oQ,depth,maxDepth,isMax,alpha,beta,stateHistory){if(checkWin('O',simBoard))return 100-depth;if(checkWin('X',simBoard))return depth-100;const stateHash=simBoard.map(c=>c===null?'.':c).join('')+`_X${xQ.join('')}_O${oQ.join('')}`;if(stateHistory.has(stateHash))return 0;if(depth>=maxDepth){return -evaluateStaticPositional(simBoard,xQ,oQ,isMax?'X':'O')}stateHistory.add(stateHash);if(isMax){let maxVal=-Infinity;for(let i=0;i<9;i++){if(simBoard[i]===null){const tempBoard=[...simBoard];const tempO=simulatePlacement(tempBoard,oQ,'O',i);const val=minimax(tempBoard,xQ,tempO,depth+1,maxDepth,false,alpha,beta,stateHistory);maxVal=Math.max(maxVal,val);alpha=Math.max(alpha,val);if(beta<=alpha)break}}stateHistory.delete(stateHash);return maxVal}else{let minVal=Infinity;for(let i=0;i<9;i++){if(simBoard[i]===null){const tempBoard=[...simBoard];const tempX=simulatePlacement(tempBoard,xQ,'X',i);const val=minimax(tempBoard,tempX,oQ,depth+1,maxDepth,true,alpha,beta,stateHistory);minVal=Math.min(minVal,val);beta=Math.min(beta,val);if(beta<=alpha)break}}stateHistory.delete(stateHash);return minVal}}
+self.onmessage=function(e){const{type,board,xMoves,oMoves,maxDepth,currentTurn}=e.data;if(type==='BEST_MOVE'){let bestScore=-Infinity;let bestMoves=[];for(let i=0;i<9;i++){if(board[i]===null){const simBoard=[...board];const simO=simulatePlacement(simBoard,oMoves,'O',i);const stateHistory=new Set();const score=minimax(simBoard,xMoves,simO,0,maxDepth,false,-Infinity,Infinity,stateHistory);if(score>bestScore){bestScore=score;bestMoves=[i]}else if(score===bestScore){bestMoves.push(i)}}}const bestChoice=bestMoves.length>0?bestMoves[Math.floor(Math.random()*bestMoves.length)]:4;self.postMessage({type:'BEST_MOVE_RESPONSE',index:bestChoice})}else if(type==='EVALUATE'){const score=evaluateStaticPositional(board,xMoves,oMoves,currentTurn);const outcomeScore=score>=0?`+${score.toFixed(1)}`:`${score.toFixed(1)}`;self.postMessage({type:'EVAL_RESPONSE',score:outcomeScore})}};
+</script>
+<script>
+let board=Array(9).fill(null),xMoves=[],oMoves=[],currentTurn='X',gameMode='ai',isGameOver=false,isAiThinking=false,showEval=false;
+const depthConfigs=[{maxDepth:3,label:"LOW (D3)"},{maxDepth:5,label:"MEDIUM (D5)"},{maxDepth:8,label:"HIGH (D8)"}];
+let currentDepthIndex=1;let maxSearchDepth=depthConfigs[currentDepthIndex].maxDepth;
+let peer=null,conn=null,myRole=null;
+const cells=document.querySelectorAll('[data-cell]'),turnIndicator=document.getElementById('turn-indicator'),myPeerIdEl=document.getElementById('my-peer-id'),connectionStatus=document.getElementById('connection-status'),alertBox=document.getElementById('game-alert'),alertTitle=document.getElementById('alert-title'),evalToggleBtn=document.getElementById('eval-toggle'),cpuLabel=document.getElementById('cpu-label'),statusLeft=document.getElementById('status-left'),statusRight=document.getElementById('status-right');
+function updateLabels(){if(gameMode==='ai'){statusLeft.textContent="YOU (X)";statusRight.style.display='none';evalToggleBtn.style.marginLeft='auto'}else if(gameMode==='local'){statusLeft.textContent="";statusRight.textContent="";statusRight.style.display='';evalToggleBtn.style.marginLeft=''}else if(gameMode==='online'){statusRight.style.display='';evalToggleBtn.style.marginLeft='';if(myRole==='X'){statusLeft.textContent="YOU X";statusRight.textContent="OPPONENT O"}else if(myRole==='O'){statusLeft.textContent="YOU O";statusRight.textContent="OPPONENT X"}else{statusLeft.textContent="YOU";statusRight.textContent="OPPONENT"}}}
+function destroyPeer(){if(peer){peer.destroy();peer=null;conn=null;myRole=null;connectionStatus.textContent="OFFLINE";myPeerIdEl.textContent="....";updateLabels()}}
+function initPeer(){destroyPeer();let customId=Math.random().toString(36).slice(2,6).toUpperCase();peer=new Peer(customId);peer.on('open',id=>{myPeerIdEl.textContent=id;connectionStatus.textContent="READY"});peer.on('connection',incomingConn=>{incomingConn.on('open',()=>{conn=incomingConn;myRole='X';connectionStatus.textContent="CONNECTED!";updateLabels();triggerReset()});incomingConn.on('data',handleNetworkData);incomingConn.on('error',()=>{connectionStatus.textContent="CONNECTION FAILED"});incomingConn.on('close',()=>{conn=null;connectionStatus.textContent="OPPONENT DISCONNECTED"})});peer.on('error',err=>{connectionStatus.textContent="ERROR: "+err.type;console.error('Peer error:',err)})}
+window.onload=()=>{cells.forEach((cell,idx)=>cell.onclick=()=>playerMove(idx));const blob=new Blob([document.getElementById('worker-script').textContent],{type:'application/javascript'});window.aiWorker=new Worker(URL.createObjectURL(blob));window.aiWorker.onmessage=e=>{if(e.data.type==='BEST_MOVE_RESPONSE'&&isAiThinking){executeMove('O',e.data.index);checkWin('O',board)?endMatch('O'):(currentTurn='X',isAiThinking=false,updateIndicators())}else if(e.data.type==='EVAL_RESPONSE'&&showEval){evalToggleBtn.textContent=`EVAL: ${e.data.score}`}};updateLabels()};
+function connectToPeer(){if(!peer)return;let targetId=document.getElementById('join-peer-id').value.trim().toUpperCase();if(!targetId)return;if(targetId===myPeerIdEl.textContent){gameMode='local';document.getElementById('mode-local').className="flex-1 py-1 text-center font-bold bg-black text-white";document.getElementById('mode-online').className="flex-1 py-1 text-center";document.getElementById('online-panel').classList.add('hidden');document.getElementById('cpu-panel').classList.remove('hidden');triggerReset();return}connectionStatus.textContent="CONNECTING...";let outgoingConn=peer.connect(targetId);outgoingConn.on('open',()=>{conn=outgoingConn;myRole='O';connectionStatus.textContent="CONNECTED!";updateLabels();triggerReset()});outgoingConn.on('data',handleNetworkData);outgoingConn.on('error',()=>connectionStatus.textContent="CONNECTION FAILED")}
+function handleNetworkData(data){board=data.board;xMoves=data.xMoves;oMoves=data.oMoves;currentTurn=data.currentTurn;isGameOver=data.isGameOver;renderBoard();if(isGameOver){const winner=checkWin('X',board)?'X':(checkWin('O',board)?'O':null);if(winner)endMatch(winner,true)}else{updateIndicators()}}
+function playerMove(idx){if(isGameOver||isAiThinking||board[idx])return;if(gameMode==='online'&&(currentTurn!==myRole||!conn))return;executeMove(currentTurn,idx);if(checkWin(currentTurn,board))return endMatch(currentTurn);currentTurn=currentTurn==='X'?'O':'X';updateIndicators();if(gameMode==='online'&&conn){conn.send({board,xMoves,oMoves,currentTurn,isGameOver})}if(gameMode==='ai'&&currentTurn==='O'){isAiThinking=true;updateIndicators();setTimeout(()=>{window.aiWorker.postMessage({type:'BEST_MOVE',board,xMoves,oMoves,maxDepth:maxSearchDepth})},500)}}
+function executeMove(p,idx){const q=p==='X'?xMoves:oMoves;if(q.length>=3)board[q.shift()]=null;q.push(idx);board[idx]=p;renderBoard()}
+function checkWin(player,b){const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];const winningLine=wins.find(line=>line.every(idx=>b[idx]===player));return winningLine?player:null}
+function renderBoard(){cells.forEach((cell,i)=>{cell.textContent=board[i]||'';if(board[i]){const queue=board[i]==='X'?xMoves:oMoves;if(queue.length===3&&queue[0]===i){cell.className="border border-black flex items-center justify-center text-4xl font-mono text-gray-300 transition-colors focus:outline-none"}else{cell.className="border border-black flex items-center justify-center text-4xl font-mono text-black transition-colors focus:outline-none"}}else{cell.className="border border-black flex items-center justify-center text-4xl font-mono hover:bg-gray-50 transition-colors focus:outline-none"}})}
+function setMode(m){if(isAiThinking)return;gameMode=m;document.getElementById('online-panel').classList.toggle('hidden',m!=='online');document.getElementById('cpu-panel').classList.toggle('hidden',m==='online');['ai','local','online'].forEach(mode=>document.getElementById(`mode-${mode}`).className=mode===m?"flex-1 py-1 text-center font-bold bg-black text-white":"flex-1 py-1 text-center");if(m=='online'){initPeer()}else{initPeer();myPeerIdEl.textContent="....";connectionStatus.textContent="OFFLINE"}updateLabels();triggerReset()}
+function changeDepth(d){currentDepthIndex=(currentDepthIndex+d+3)%3;maxSearchDepth=depthConfigs[currentDepthIndex].maxDepth;cpuLabel.textContent=depthConfigs[currentDepthIndex].label;triggerEvalCalculation()}
+function updateIndicators(){if(gameMode==='online'){if(!conn){turnIndicator.textContent="WAITING..."}else{turnIndicator.textContent=currentTurn===myRole?"YOUR TURN":"OPPONENT'S TURN"}}else if(gameMode==='ai'){turnIndicator.textContent=currentTurn==='X'?"YOUR TURN":"THINKING..."}else{turnIndicator.textContent=currentTurn==='X'?"PLAYER X":"PLAYER O"}triggerEvalCalculation()}
+function triggerEvalCalculation(){if(showEval&&window.aiWorker){window.aiWorker.postMessage({type:'EVALUATE',board,xMoves,oMoves,currentTurn,maxDepth:maxSearchDepth})}}
+function endMatch(w,remoteCall=false){isGameOver=true;let msg;if(gameMode==='local'){msg=`${w} WINS!`}else{msg=w===(gameMode==='ai'?'X':myRole)?'You Won!':'You Lost'}alertTitle.textContent=msg;alertBox.classList.remove('hidden');if(gameMode==='online'&&!remoteCall&&conn){conn.send({board,xMoves,oMoves,currentTurn,isGameOver})}}
+function triggerReset(){board=Array(9).fill(null);xMoves=[];oMoves=[];currentTurn='X';isGameOver=false;isAiThinking=false;renderBoard();updateIndicators();if(gameMode==='online'&&conn){conn.send({board,xMoves,oMoves,currentTurn,isGameOver})}}
+function closeAlert(){alertBox.classList.add('hidden');triggerReset()}
+function toggleEval(){showEval=!showEval;evalToggleBtn.textContent=showEval?"EVAL: ...":"EVAL: OFF";if(showEval)triggerEvalCalculation()}
+function copyPeerID(){const idText=myPeerIdEl.textContent;if(idText==="....")return;navigator.clipboard.writeText(idText).then(()=>{const btn=document.getElementById('btn-copy');btn.textContent="DONE";setTimeout(()=>btn.textContent="COPY",2000)})}
+</script>
+</body>
+</html>
